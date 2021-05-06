@@ -1,7 +1,8 @@
-
 import express from 'express';
 import { Group } from './models';
 import { SonosService, IpService, DeviceService } from './services';
+
+const listener = require('sonos').Listener;
 
 // Settings
 const PORT = process.env.PORT || 5050;
@@ -21,9 +22,20 @@ app.use(express.static('public'));
 app.get('/devices', (req, res) => res.send(devices));
 
 app.get('/ring', async (req, res) => {
-  for (const device of devices) {
-    SonosService.ring(localIp[0], PORT, device, DEBUG);
-  }
+  //Grab the Sonos library Listener singleton here
+  //and start listening, otherwise the first PlayNotification()
+  //to complete will cancel all other listeners
+  const listener = require('sonos').Listener;
+  listener.startListener();
+
+  const ringAll = devices.map(async dev => {
+    await SonosService.ring(localIp[0], PORT, dev, DEBUG);
+  })
+
+  Promise.all(ringAll).then(function (responses) {
+    //Clean up the listeners now
+    listener.stopListener();
+  });
 
   res.send({});
 });
