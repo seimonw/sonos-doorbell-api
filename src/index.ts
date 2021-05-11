@@ -11,6 +11,7 @@ const DEBUG = process.env.DEBUG ? process.env.DEBUG == "true" : false;
 // Variables
 let localIp: string[] = null;
 let devices: Group[] = [];
+let lock = false;
 
 // Server configuration
 const app = express();
@@ -22,6 +23,14 @@ app.use(express.static('public'));
 app.get('/devices', (req, res) => res.send(devices));
 
 app.get('/ring', async (req, res) => {
+  if (lock) {
+    res.json({err: 'server busy'});
+    return;
+  }
+
+  lock = true;
+  res.send({});
+
   //Grab the Sonos library Listener singleton here
   //and start listening, otherwise the first PlayNotification()
   //to complete will cancel all other listeners
@@ -32,12 +41,12 @@ app.get('/ring', async (req, res) => {
     await SonosService.ring(localIp[0], PORT, dev, DEBUG);
   })
 
-  Promise.all(ringAll).then(function (responses) {
+  await Promise.all(ringAll).then(function (responses) {
     //Clean up the listeners now
     listener.stopListener();
   });
 
-  res.send({});
+  lock = false;
 });
 
 // Start the server
